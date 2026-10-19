@@ -180,6 +180,7 @@
     }
 
     .row > input,
+    .row > textarea,
     .row > select {
       min-width: 0;
       flex: 1 1 auto;
@@ -187,6 +188,11 @@
       border: 1px solid var(--border);
       border-radius: 6px;
       background: #fff;
+    }
+
+    .row > textarea {
+      resize: vertical;
+      min-height: 72px;
     }
 
     .button-row {
@@ -270,6 +276,31 @@
       text-align: center;
       font-size: 11px;
       color: #475569;
+    }
+
+    /* ===== 重ねて置く設備の色見本 ===== */
+    .layer-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 14px;
+      margin-top: 8px;
+      font-size: 12px;
+      color: #334155;
+    }
+
+    .layer-legend span {
+      display: inline-flex;
+      gap: 5px;
+      align-items: center;
+    }
+
+    .layer-legend i {
+      display: inline-block;
+      width: 13px;
+      height: 13px;
+      border: 2px solid currentColor;
+      border-radius: 3px;
+      background: color-mix(in srgb, currentColor 25%, white);
     }
 
     .hidden { display: none !important; }
@@ -361,6 +392,7 @@
       }
 
       .row > input,
+      .row > textarea,
       .row > select {
         min-height: 44px;
         font-size: 16px;
@@ -403,15 +435,35 @@
         ベルトパーテーションは<strong>長さ1.80mの線</strong>として配置し、片端の丸ハンドルをつかんで長さを調整できます。伸ばせる上限は<strong>1.80m以下</strong>です。
       </div>
 
-      <h2>備品を追加</h2>
+      <h2>備品・説明ラベルを追加</h2>
       <div id="equipmentGrid" class="equipment-grid"></div>
+      <div class="layer-legend" aria-label="重ねて配置する設備の色">
+        <span style="color:#0d9488"><i></i>床保護シート</span>
+        <span style="color:#dc2626"><i></i>ステージ</span>
+        <span style="color:#2563eb"><i></i>スタジアム</span>
+        <span style="color:#d97706"><i></i>人</span>
+      </div>
 
       <h2>選択中の備品</h2>
       <div id="noSelection" class="small">備品をタップしてください。「2備品選択」をONにするとスマホでも2つ選べます。</div>
       <div id="selectionPanel" class="hidden">
-        <div class="row">
+        <div id="itemNameRow" class="row">
           <label for="itemName">名称</label>
           <input id="itemName" type="text" />
+        </div>
+        <div id="zoneTextEditor" class="hidden">
+          <div class="row">
+            <label for="zoneText">説明文</label>
+            <textarea id="zoneText" rows="3" placeholder="例：受付ゾーン"></textarea>
+          </div>
+          <div class="row">
+            <label for="zoneFontSize">文字サイズ (px)</label>
+            <input id="zoneFontSize" type="number" min="12" max="150" step="2" value="30" />
+          </div>
+          <div class="row">
+            <label for="zoneTextColor">文字色</label>
+            <input id="zoneTextColor" type="color" value="#0f172a" />
+          </div>
         </div>
         <div class="row">
           <label for="itemWidth">幅 (mm)</label>
@@ -441,7 +493,7 @@
         <button id="measureModeButton" class="btn">2点距離を追加</button>
         <button id="clearMeasuresButton" class="btn danger">計測線を全削除</button>
       </div>
-      <div class="small" style="margin-top:6px;">「2備品選択」は2つの備品間の中心距離・最短間隔を確認します。「任意距離を計測」は図面上をドラッグして距離を測ります。</div>
+      <div class="small" style="margin-top:6px;">「2備品選択」は2つの備品間の中心距離・最短間隔を確認します。「2点距離を追加」は2点を順番にタップし、タップ位置に最も近いオブジェクトの外端へ自動吸着して距離線を追加します。</div>
       <ul id="measurementList" class="measurement-list"></ul>
 
       <h2>グリッド・スナップ</h2>
@@ -459,10 +511,10 @@
         <label><input id="exportGrid" type="checkbox" /> PNGにもグリッド出力</label>
       </div>
 
-      <h2>使用数</h2>
+      <h2>使用数（上限なし）</h2>
       <table class="summary-table">
         <thead>
-          <tr><th>備品</th><th>数</th><th>上限</th></tr>
+          <tr><th>備品</th><th>数</th></tr>
         </thead>
         <tbody id="summaryBody"></tbody>
       </table>
@@ -470,7 +522,9 @@
       <h2>操作</h2>
       <div class="small">
         <div><span class="kbd">ドラッグ</span> 移動</div>
+        <div><span class="kbd">説明ラベル</span> 「受付ゾーン」などの文章を編集して図面上に表示</div>
         <div><span class="kbd">●</span> 選択枠上の丸をドラッグして回転</div>
+        <div><span class="kbd">半円</span> 直線側の中央が基準点。回転で向きを変更</div>
         <div><span class="kbd">2備品選択</span> スマホでも2つの備品を選択</div>
         <div><span class="kbd">2本指</span> ピンチで拡大・縮小</div>
         <div><span class="kbd">背景ドラッグ</span> スマホでは図面をスクロール</div>
@@ -528,17 +582,20 @@
     // exact=true は写真に平面寸法が明記されているものです。
     // exact=false は平面寸法が不足しているため、配置用の仮寸法です。
     const equipmentTypes = [
-      { key: 'desk', name: '長机', widthMm: 1800, depthMm: 600, exact: true, unitPrice: 0, maxCount: 10, shape: 'rect' },
-      { key: 'chair', name: 'いす', widthMm: 450, depthMm: 450, exact: false, unitPrice: 0, maxCount: 40, shape: 'rect' },
-      { key: 'belt-partition', name: 'ベルトパーテーション', widthMm: 1800, depthMm: 120, exact: true, unitPrice: 0, maxCount: 20, shape: 'belt' },
-      { key: 'panel-large', name: 'パネル 大', widthMm: 900, depthMm: 100, exact: false, unitPrice: 0, maxCount: 5, shape: 'rect' },
-      { key: 'panel-small', name: 'パネル 小', widthMm: 900, depthMm: 100, exact: false, unitPrice: 0, maxCount: 20, shape: 'rect' },
-      { key: 'caster-panel', name: 'キャスター付きパネル', widthMm: 900, depthMm: 450, exact: false, unitPrice: 0, maxCount: 5, shape: 'rect' },
-      { key: 'stage', name: 'ステージ', widthMm: 2400, depthMm: 1200, exact: true, unitPrice: 0, maxCount: 10, shape: 'rect' },
-      { key: 'stadium-450', name: 'スタジアム', widthMm: 450, depthMm: 450, exact: true, unitPrice: 0, maxCount: null, shape: 'rect' },
-      { key: 'person', name: '人', widthMm: 500, depthMm: 500, exact: false, unitPrice: 0, maxCount: null, shape: 'circle' },
-      { key: 'audio', name: '音響設備（1式）', widthMm: 600, depthMm: 600, exact: false, unitPrice: 0, maxCount: 1, shape: 'rect' },
-      { key: 'rear-space', name: '予備スペース', widthMm: 1800, depthMm: 1800, exact: false, unitPrice: 0, maxCount: null, shape: 'area' }
+      { key: 'desk', name: '長机', widthMm: 1800, depthMm: 600, exact: true, shape: 'rect' },
+      { key: 'chair', name: 'いす', widthMm: 450, depthMm: 450, exact: false, shape: 'rect' },
+      { key: 'belt-partition', name: 'ベルトパーテーション', widthMm: 1800, depthMm: 120, exact: true, shape: 'belt' },
+      { key: 'panel-large', name: 'パネル 大', widthMm: 900, depthMm: 100, exact: false, shape: 'rect' },
+      { key: 'panel-small', name: 'パネル 小', widthMm: 900, depthMm: 100, exact: false, shape: 'rect' },
+      { key: 'caster-panel', name: 'キャスター付きパネル', widthMm: 900, depthMm: 450, exact: false, shape: 'rect' },
+      { key: 'stage', name: 'ステージ', widthMm: 2400, depthMm: 1200, exact: true, shape: 'rect' },
+      { key: 'stadium-450', name: 'スタジアム', widthMm: 450, depthMm: 450, exact: true, shape: 'rect' },
+      { key: 'background-panel', name: '背景', widthMm: 3000, depthMm: 500, exact: true, shape: 'rect' },
+      { key: 'person', name: '人', widthMm: 500, depthMm: 500, exact: false, shape: 'circle' },
+      { key: 'wall-clearance-circle', name: '1m確認半円', widthMm: 2000, depthMm: 2000, exact: true, shape: 'semicircle' },
+      { key: 'audio', name: '音響設備（1式）', widthMm: 600, depthMm: 600, exact: false, shape: 'rect' },
+      { key: 'rear-space', name: '床保護シート', widthMm: 1800, depthMm: 1800, exact: false, shape: 'area' },
+      { key: 'zone-text', name: 'テキスト（ゾーン説明）', widthMm: 3000, depthMm: 1000, exact: false, shape: 'text' }
     ];
 
     // ===== DOM参照 =====
@@ -551,6 +608,11 @@
     const noSelection = document.getElementById('noSelection');
     const pairPanel = document.getElementById('pairPanel');
     const itemName = document.getElementById('itemName');
+    const itemNameRow = document.getElementById('itemNameRow');
+    const zoneTextEditor = document.getElementById('zoneTextEditor');
+    const zoneText = document.getElementById('zoneText');
+    const zoneFontSize = document.getElementById('zoneFontSize');
+    const zoneTextColor = document.getElementById('zoneTextColor');
     const itemWidth = document.getElementById('itemWidth');
     const itemDepth = document.getElementById('itemDepth');
     const itemAngle = document.getElementById('itemAngle');
@@ -601,10 +663,13 @@
       'panel-small': '#9333ea',
       'caster-panel': '#db2777',
       'stage': '#dc2626',
-      'stadium-450': '#0284c7',
-      'person': '#f59e0b',
+      'stadium-450': '#2563eb',
+      'background-panel': '#64748b',
+      'person': '#d97706',
+      'wall-clearance-circle': '#10b981',
       'audio': '#0f172a',
-      'rear-space': '#0891b2'
+      'rear-space': '#0d9488',
+      'zone-text': '#334155'
     };
 
     // ===== ユーティリティ =====
@@ -937,14 +1002,6 @@
         return;
       }
 
-      const currentCount = countType(typeKey);
-      const hasLimit = !!type.maxCount;
-      const isLimitReached = hasLimit && currentCount >= type.maxCount;
-      if (isLimitReached) {
-        alert(`${type.name}は最大${type.maxCount}個です。`);
-        return;
-      }
-
       const visibleCenter = getVisibleCanvasCenter();
       const offset = mmToPx(250);
       let x = sourceItem ? sourceItem.x + offset : visibleCenter.x;
@@ -960,6 +1017,14 @@
         depthMm: sourceItem ? sourceItem.depthMm : type.depthMm,
         angle: sourceItem ? sourceItem.angle : 0
       };
+
+      // 説明ラベルは設備名ではなく、任意の文章を描画します。
+      if (type.key === 'zone-text') {
+        item.name = sourceItem ? sourceItem.name : 'ここは何のゾーン？';
+        item.fontSizePx = sourceItem?.fontSizePx || 30;
+        item.textColor = sourceItem?.textColor || '#0f172a';
+        ensureZoneTextHeight(item);
+      }
 
       items.push(item);
       selectedIds = [item.id];
@@ -1047,9 +1112,11 @@
       const halfW = mmToPx(item.widthMm) / 2;
       const halfH = mmToPx(item.depthMm) / 2;
 
-      if (type?.shape === 'circle') {
+      if (type?.shape === 'circle' || type?.shape === 'semicircle') {
         const radius = Math.min(halfW, halfH);
-        return Math.hypot(local.x, local.y) <= radius;
+        const isInsideRadius = Math.hypot(local.x, local.y) <= radius;
+        const isInsideHalf = local.y <= 0;
+        return isInsideRadius && (type.shape === 'circle' || isInsideHalf);
       }
 
       if (type?.shape === 'belt') {
@@ -1084,9 +1151,31 @@
       return Math.hypot(x - handle.x, y - handle.y) <= radius;
     }
 
+    // ===== 描画順の統一 =====
+    // シート→ステージ→スタジアム→人の順に重ねて表示します。
+    // 配置の追加順に依存しないため、下の設備が上の設備を隠しません。
+    const layerOrders = {
+      'rear-space': -30,
+      'stage': -20,
+      'wall-clearance-circle': -10,
+      'stadium-450': 10,
+      'person': 20,
+      'zone-text': 50
+    };
+
+    function getItemsInDrawOrder() {
+      // items 自体は保存・編集に使うため、描画用の配列だけ並び替えます。
+      return items.slice().sort((first, second) => {
+        const firstOrder = layerOrders[first.typeKey] ?? 0;
+        const secondOrder = layerOrders[second.typeKey] ?? 0;
+        return firstOrder - secondOrder;
+      });
+    }
+
     function findItemAt(x, y) {
-      for (let index = items.length - 1; index >= 0; index -= 1) {
-        const item = items[index];
+      const orderedItems = getItemsInDrawOrder();
+      for (let index = orderedItems.length - 1; index >= 0; index -= 1) {
+        const item = orderedItems[index];
         if (hitTestItem(item, x, y)) {
           return item;
         }
@@ -1223,6 +1312,29 @@
       };
     }
 
+    // ===== 半円の境界への距離吸着 =====
+    // 外端は上半分の円弧と、基準点を通る直径の線分です。
+    function getClosestPointOnSemicircle(item, x, y) {
+      const local = canvasPointToLocal(item, x, y);
+      const radius = Math.min(mmToPx(item.widthMm), mmToPx(item.depthMm)) / 2;
+      const diameterPoint = { x: clamp(local.x, -radius, radius), y: 0 };
+
+      let arcX = local.x < 0 ? -radius : radius;
+      let arcY = 0;
+      const distanceToCenter = Math.hypot(local.x, local.y);
+      const isAboveDiameter = local.y < 0;
+      if (isAboveDiameter && distanceToCenter) {
+        arcX = radius * local.x / distanceToCenter;
+        arcY = radius * local.y / distanceToCenter;
+      }
+
+      const arcDistance = Math.hypot(local.x - arcX, local.y - arcY);
+      const diameterDistance = Math.hypot(local.x - diameterPoint.x, local.y);
+      const isArcCloser = arcDistance < diameterDistance;
+      const closest = isArcCloser ? { x: arcX, y: arcY } : diameterPoint;
+      return localPointToCanvas(item, closest.x, closest.y);
+    }
+
     function getClosestPointOnItem(item, x, y) {
       const type = getEquipmentType(item.typeKey);
       const point = { x, y };
@@ -1236,16 +1348,28 @@
         return getClosestPointOnCircle(item, x, y);
       }
 
+      if (type?.shape === 'semicircle') {
+        return getClosestPointOnSemicircle(item, x, y);
+      }
+
       return getClosestPointOnRectangle(item, x, y);
     }
 
     function getAutoFitMeasurementPoint(x, y) {
-      if (!items.length) {
+      const snappableItems = getItemsInDrawOrder().filter((item) => item.typeKey !== 'zone-text');
+      if (!snappableItems.length) {
         return { x, y, itemId: null };
       }
 
-      // 備品そのものを押した場合は、その備品の外端を優先します。
-      const hitItem = findItemAt(x, y);
+      // 説明ラベルを透過し、背後にある物理設備を選びます。
+      let hitItem = null;
+      for (let index = snappableItems.length - 1; index >= 0; index -= 1) {
+        const candidate = snappableItems[index];
+        if (hitTestItem(candidate, x, y)) {
+          hitItem = candidate;
+          break;
+        }
+      }
       if (hitItem) {
         const edgePoint = getClosestPointOnItem(hitItem, x, y);
         return {
@@ -1257,7 +1381,7 @@
 
       // 備品の外側を押した場合は、押した点に最も近い外端へ吸着します。
       let nearest = null;
-      for (const item of items) {
+      for (const item of snappableItems) {
         const edgePoint = getClosestPointOnItem(item, x, y);
         const distancePx = Math.hypot(x - edgePoint.x, y - edgePoint.y);
         const isNearer = !nearest || distancePx < nearest.distancePx;
@@ -1327,12 +1451,83 @@
       // ベルトパーテーションは個別の備品として描画するため、ここでは何もしません。
     }
 
+    // ===== 説明ラベルの折り返しとサイズ計算 =====
+    // PDFを描画したキャンバスのピクセル単位で文字サイズを扱います。
+    function getZoneTextLines(item, targetCtx) {
+      const fontSize = item.fontSizePx || 30;
+      const maxTextWidth = Math.max(30, mmToPx(item.widthMm) - 24);
+      const paragraphs = item.name.split(/\r?\n/);
+      const lines = [];
+      targetCtx.font = `700 ${fontSize}px system-ui, sans-serif`;
+
+      for (const paragraph of paragraphs) {
+        let currentLine = '';
+        for (const character of paragraph) {
+          const candidate = currentLine + character;
+          const willOverflow = targetCtx.measureText(candidate).width > maxTextWidth;
+          if (willOverflow && !!currentLine) {
+            lines.push(currentLine);
+            currentLine = character;
+          } else {
+            currentLine = candidate;
+          }
+        }
+        lines.push(currentLine || ' ');
+      }
+      return lines;
+    }
+
+    function ensureZoneTextHeight(item) {
+      if (item.typeKey !== 'zone-text') {
+        return;
+      }
+      const fontSize = item.fontSizePx || 30;
+      const lines = getZoneTextLines(item, ctx);
+      const requiredHeightMm = pxToMm(lines.length * fontSize * 1.25 + 24);
+      item.depthMm = Math.max(item.depthMm, requiredHeightMm);
+    }
+
+    // ===== 個々のオブジェクトの描画 =====
     function drawItem(targetCtx, item, includeSelection, visualZoom = zoom) {
       const type = getEquipmentType(item.typeKey);
       const widthPx = mmToPx(item.widthMm);
       const heightPx = mmToPx(item.depthMm);
       const color = typeColors[item.typeKey] || '#475569';
       const isSelected = selectedIds.includes(item.id);
+
+      if (type?.shape === 'text') {
+        const fontSize = item.fontSizePx || 30;
+        const width = Math.max(widthPx, 40);
+        const height = Math.max(heightPx, fontSize * 1.5);
+        const color = item.textColor || '#0f172a';
+
+        targetCtx.save();
+        targetCtx.translate(item.x, item.y);
+        targetCtx.rotate(toRad(item.angle));
+
+        // 色を重ねた備品の上でも読めるよう、白い背景を持つ文章ラベルにします。
+        targetCtx.fillStyle = 'rgba(255,255,255,0.94)';
+        targetCtx.strokeStyle = '#64748b';
+        targetCtx.lineWidth = 1.8 / Math.max(visualZoom, 0.25);
+        targetCtx.fillRect(-width / 2, -height / 2, width, height);
+        targetCtx.strokeRect(-width / 2, -height / 2, width, height);
+
+        const lines = getZoneTextLines(item, targetCtx);
+        const lineHeight = fontSize * 1.25;
+        const firstLineY = -(lines.length - 1) * lineHeight / 2;
+        targetCtx.textAlign = 'center';
+        targetCtx.textBaseline = 'middle';
+        targetCtx.fillStyle = color;
+        for (let index = 0; index < lines.length; index += 1) {
+          targetCtx.fillText(lines[index], 0, firstLineY + index * lineHeight);
+        }
+        targetCtx.restore();
+
+        if (includeSelection && isSelected) {
+          drawSelection(targetCtx, item, visualZoom);
+        }
+        return;
+      }
 
       if (type?.shape === 'belt') {
         const [start, end] = getBeltEndpoints(item);
@@ -1364,11 +1559,29 @@
       targetCtx.save();
       targetCtx.translate(item.x, item.y);
       targetCtx.rotate(toRad(item.angle));
-      targetCtx.fillStyle = `${color}55`;
+      const isStackable = ['rear-space', 'stage', 'stadium-450', 'person'].includes(item.typeKey);
+      const fillAlpha = item.typeKey === 'rear-space' ? '1f' : (isStackable ? '66' : '55');
+      targetCtx.fillStyle = `${color}${fillAlpha}`;
       targetCtx.strokeStyle = color;
-      targetCtx.lineWidth = Math.max(2, 2 / Math.max(visualZoom, 0.25));
+      targetCtx.lineWidth = Math.max(2, (isStackable ? 3 : 2) / Math.max(visualZoom, 0.25));
 
-      if (type?.shape === 'circle') {
+      if (type?.shape === 'semicircle') {
+        // 半径1m。直線側中央に基準点を置き、円弧側を向けて使用します。
+        const radius = Math.min(widthPx, heightPx) / 2;
+        targetCtx.fillStyle = `${color}22`;
+        targetCtx.setLineDash([10 / Math.max(visualZoom, 0.25), 6 / Math.max(visualZoom, 0.25)]);
+        targetCtx.beginPath();
+        targetCtx.moveTo(-radius, 0);
+        targetCtx.arc(0, 0, radius, Math.PI, Math.PI * 2);
+        targetCtx.closePath();
+        targetCtx.fill();
+        targetCtx.stroke();
+        targetCtx.setLineDash([]);
+        targetCtx.beginPath();
+        targetCtx.arc(0, 0, 5 / Math.max(visualZoom, 0.25), 0, Math.PI * 2);
+        targetCtx.fillStyle = color;
+        targetCtx.fill();
+      } else if (type?.shape === 'circle') {
         const radius = Math.min(widthPx, heightPx) / 2;
         targetCtx.beginPath();
         targetCtx.arc(0, 0, radius, 0, Math.PI * 2);
@@ -1390,6 +1603,8 @@
 
       const minimumFontPx = 10 / Math.max(visualZoom, 0.25);
       const fontPx = Math.max(minimumFontPx, Math.min(widthPx, heightPx) * 0.24);
+      const labelOffsetY = type?.shape === 'semicircle' ? -Math.min(widthPx, heightPx) * 0.22 : 0;
+      targetCtx.translate(0, labelOffsetY);
       targetCtx.rotate(-toRad(item.angle));
       targetCtx.fillStyle = '#0f172a';
       targetCtx.textAlign = 'center';
@@ -1404,6 +1619,38 @@
     }
 
     function drawSelection(targetCtx, item, visualZoom = zoom) {
+      const type = getEquipmentType(item.typeKey);
+      if (type?.shape === 'semicircle') {
+        const radius = Math.min(mmToPx(item.widthMm), mmToPx(item.depthMm)) / 2;
+        const handle = getRotationHandle(item);
+        const topPoint = localPointToCanvas(item, 0, -radius);
+        const handleRadius = 8 / Math.max(visualZoom, 0.25);
+        targetCtx.save();
+        targetCtx.translate(item.x, item.y);
+        targetCtx.rotate(toRad(item.angle));
+        targetCtx.strokeStyle = '#0ea5e9';
+        targetCtx.lineWidth = 3 / Math.max(visualZoom, 0.25);
+        targetCtx.beginPath();
+        targetCtx.arc(0, 0, radius, Math.PI, Math.PI * 2);
+        targetCtx.closePath();
+        targetCtx.stroke();
+        targetCtx.restore();
+        targetCtx.save();
+        targetCtx.strokeStyle = '#0ea5e9';
+        targetCtx.fillStyle = '#fff';
+        targetCtx.lineWidth = 2 / Math.max(visualZoom, 0.25);
+        targetCtx.beginPath();
+        targetCtx.moveTo(topPoint.x, topPoint.y);
+        targetCtx.lineTo(handle.x, handle.y);
+        targetCtx.stroke();
+        targetCtx.beginPath();
+        targetCtx.arc(handle.x, handle.y, handleRadius, 0, Math.PI * 2);
+        targetCtx.fill();
+        targetCtx.stroke();
+        targetCtx.restore();
+        return;
+      }
+
       if (isBeltPartition(item)) {
         const [start, end] = getBeltEndpoints(item);
         const lineWidth = 3 / Math.max(visualZoom, 0.25);
@@ -1531,7 +1778,7 @@
 
       drawBeltConnections(ctx);
 
-      for (const item of items) {
+      for (const item of getItemsInDrawOrder()) {
         drawItem(ctx, item, includeSelection);
       }
       for (const measure of measurements) {
@@ -1849,14 +2096,19 @@
           sizeLabel = `幅900mm / 奥行450mm（仮）`;
         } else if (type.key === 'stadium-450') {
           sizeLabel = `450 × 450 mm`;
+        } else if (type.key === 'background-panel') {
+          sizeLabel = `3000 × 500 mm`;
         } else if (type.key === 'person') {
           sizeLabel = `直径500mm`;
+        } else if (type.key === 'wall-clearance-circle') {
+          sizeLabel = `半径1000mm / 半円（方向変更可）`;
         } else if (type.key === 'rear-space') {
           sizeLabel = `1800 × 1800 mm`;
+        } else if (type.key === 'zone-text') {
+          sizeLabel = `自由入力 / 改行・色・文字サイズ対応`;
         }
 
-        const limitLabel = type.maxCount ? `最大${type.maxCount}` : '上限なし';
-        button.innerHTML = `<strong>${type.name}</strong><span>${sizeLabel}</span><span>${limitLabel}</span>`;
+        button.innerHTML = `<strong>${type.name}</strong><span>${sizeLabel}</span>`;
         button.addEventListener('click', () => addEquipment(type.key));
         equipmentGrid.appendChild(button);
       }
@@ -1873,7 +2125,18 @@
       }
 
       const type = getEquipmentType(item.typeKey);
+      const isZoneText = item.typeKey === 'zone-text';
+      itemNameRow.classList.toggle('hidden', isZoneText);
+      zoneTextEditor.classList.toggle('hidden', !isZoneText);
       itemName.value = item.name;
+      if (isZoneText) {
+        zoneText.value = item.name;
+        zoneFontSize.value = item.fontSizePx || 30;
+        zoneTextColor.value = item.textColor || '#0f172a';
+      }
+      const isFixedRadius = item.typeKey === 'wall-clearance-circle';
+      itemWidth.disabled = isFixedRadius;
+      itemDepth.disabled = isFixedRadius;
       itemWidth.value = Math.round(item.widthMm);
       itemDepth.value = Math.round(item.depthMm);
       itemAngle.value = Math.round(item.angle);
@@ -1883,10 +2146,16 @@
         dimensionNote.textContent = '幅900mmは記載寸法、平面上の厚みは配置確認用の仮寸法です。';
       } else if (item.typeKey === 'stadium-450') {
         dimensionNote.textContent = '上から見た 450mm × 450mm の四角として配置しています。';
+      } else if (item.typeKey === 'background-panel') {
+        dimensionNote.textContent = '背景は 3,000mm × 500mm の平面サイズとして配置しています。高さ約3mは図面上では扱いません。';
       } else if (item.typeKey === 'person') {
         dimensionNote.textContent = '人1人ぶんの目安として、直径500mmの円で配置しています。';
+      } else if (item.typeKey === 'wall-clearance-circle') {
+        dimensionNote.textContent = '直線側中央の点から半径1mの半円です。配置を移動・回転して壁との距離を確認できます。半径は固定です。';
       } else if (item.typeKey === 'rear-space') {
-        dimensionNote.textContent = '予備スペースとして、1,800mm × 1,800mm の範囲で配置しています。';
+        dimensionNote.textContent = '床保護シートを1,800mm × 1,800mmの面として表示します。重ねた設備が見えるよう薄い青緑色で描画します。';
+      } else if (item.typeKey === 'zone-text') {
+        dimensionNote.textContent = 'ゾーンの説明を自由に入力できます。文章は自動折り返しされ、ラベルの幅・角度も変更できます。';
       } else {
         dimensionNote.textContent = type?.exact
           ? '写真に記載された平面寸法を初期値にしています。'
@@ -1942,7 +2211,7 @@
       for (const type of equipmentTypes) {
         const count = countType(type.key);
         const row = document.createElement('tr');
-        row.innerHTML = `<td>${type.name}</td><td>${count}</td><td>${type.maxCount ?? '−'}</td>`;
+        row.innerHTML = `<td>${type.name}</td><td>${count}</td>`;
         summaryBody.appendChild(row);
       }
     }
@@ -1968,9 +2237,21 @@
       const widthMm = Number(itemWidth.value);
       const depthMm = Number(itemDepth.value);
       const angle = Number(itemAngle.value);
-      item.name = itemName.value.trim() || getEquipmentType(item.typeKey)?.name || '備品';
+      const isZoneText = item.typeKey === 'zone-text';
+      const inputName = isZoneText ? zoneText.value : itemName.value;
+      item.name = inputName.trim() || getEquipmentType(item.typeKey)?.name || '備品';
 
-      if (Number.isFinite(widthMm) && widthMm > 0) {
+      if (isZoneText) {
+        const fontSize = Number(zoneFontSize.value);
+        if (Number.isFinite(fontSize)) {
+          item.fontSizePx = clamp(fontSize, 12, 150);
+          zoneFontSize.value = item.fontSizePx;
+        }
+        item.textColor = zoneTextColor.value;
+      }
+
+      const isFixedRadius = item.typeKey === 'wall-clearance-circle';
+      if (!isFixedRadius && Number.isFinite(widthMm) && widthMm > 0) {
         if (isBeltPartition(item)) {
           item.widthMm = clamp(widthMm, BELT_MIN_LENGTH_MM, BELT_MAX_LENGTH_MM);
           itemWidth.value = Math.round(item.widthMm);
@@ -1979,10 +2260,14 @@
         }
       }
 
-      if (Number.isFinite(depthMm) && depthMm > 0) {
+      if (!isFixedRadius && Number.isFinite(depthMm) && depthMm > 0) {
         item.depthMm = depthMm;
       }
       item.angle = Number.isFinite(angle) ? normalizeAngle(angle) : item.angle;
+      ensureZoneTextHeight(item);
+      if (isZoneText) {
+        itemDepth.value = Math.round(item.depthMm);
+      }
       draw();
       updatePairPanel();
       saveLocalState();
@@ -2015,6 +2300,27 @@
       items = state.items;
       measurements = state.measurements;
       migrateBeltLinks();
+      // 以前のJSON / localStorage内の名前はデフォルト値の場合だけ更新します。
+      for (const item of items) {
+        const hasLegacySheetName = item.typeKey === 'rear-space' &&
+          ['予備スペース', '後方スペース 1坪（正方形換算）'].includes(item.name);
+        if (hasLegacySheetName) {
+          item.name = '床保護シート';
+        }
+        const hasLegacyCircleName = item.typeKey === 'wall-clearance-circle' && item.name === '1m確認円';
+        if (hasLegacyCircleName) {
+          item.name = '1m確認半円';
+        }
+        if (item.typeKey === 'wall-clearance-circle') {
+          item.widthMm = 2000;
+          item.depthMm = 2000;
+        }
+        if (item.typeKey === 'zone-text') {
+          item.fontSizePx = item.fontSizePx || 30;
+          item.textColor = item.textColor || '#0f172a';
+          ensureZoneTextHeight(item);
+        }
+      }
       nextItemId = Number(state.nextItemId) || items.length + 1;
       nextMeasureId = Number(state.nextMeasureId) || measurements.length + 1;
       selectedIds = [];
@@ -2051,7 +2357,7 @@
         drawGrid(exportCtx);
       }
       drawBeltConnections(exportCtx, 1);
-      for (const item of items) {
+      for (const item of getItemsInDrawOrder()) {
         drawItem(exportCtx, item, false, 1);
       }
       for (const measure of measurements) {
@@ -2093,6 +2399,9 @@
     canvas.addEventListener('contextmenu', (event) => event.preventDefault());
 
     itemName.addEventListener('input', applySelectionInput);
+    zoneText.addEventListener('input', applySelectionInput);
+    zoneFontSize.addEventListener('change', applySelectionInput);
+    zoneTextColor.addEventListener('input', applySelectionInput);
     itemWidth.addEventListener('change', applySelectionInput);
     itemDepth.addEventListener('change', applySelectionInput);
     itemAngle.addEventListener('change', applySelectionInput);
